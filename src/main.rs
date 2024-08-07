@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::ops::RangeInclusive;
 use std::time::SystemTime;
 
 use iced::keyboard;
@@ -20,10 +22,14 @@ fn main() -> iced::Result {
     })
 }
 
-struct Promt {
+struct Promt<'a> {
     morze: String,
+    text: String,
     timer: SystemTime,
-    dot_time: u128,
+    dot_time: RangeInclusive<u128>,
+    line_time: RangeInclusive<u128>,
+    space_time: RangeInclusive<u128>,
+    morze_table: HashMap<&'a str, char>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,9 +37,10 @@ pub enum Msg {
     KeyPressed,
     KeyReleased,
     Clear,
+    Decode,
 }
 
-impl Application for Promt {
+impl Application for Promt<'_> {
     type Message = Msg;
     type Executor = executor::Default;
 
@@ -45,8 +52,45 @@ impl Application for Promt {
         (
             Self {
                 morze: String::new(),
+                text: String::new(),
                 timer: SystemTime::now(),
-                dot_time: 100,
+                dot_time: 100/2..=100*3/2,
+                line_time: 300/2..=300*3/2,
+                space_time: 300..=300*3,
+                morze_table: HashMap::from([
+                    ("*—", 'А'),
+                    ("—***", 'Б'),
+                    ("*——", 'В'),
+                    ("——*", 'Г'),
+                    ("—**", 'Д'),
+                    ("*", 'Е'),
+                    ("***—", 'Ж'),
+                    ("——**", 'З'),
+                    ("**", 'И'),
+                    ("*——", 'Й'),
+                    ("—*—", 'К'),
+                    ("*—**", 'Л'),
+                    ("——", 'М'),
+                    ("—*", 'Н'),
+                    ("———", 'О'),
+                    ("*——*", 'П'),
+                    ("*—*", 'Р'),
+                    ("***", 'С'),
+                    ("—", 'Т'),
+                    ("**—", 'У'),
+                    ("**—*", 'Ф'),
+                    ("****", 'Х'),
+                    ("—*—*", 'Ц'),
+                    ("———*", 'Ч'),
+                    ("————", 'Ш'),
+                    ("——*—", 'Щ'),
+                    ("*——*—*", 'Ъ'),
+                    ("—*——", 'Ы'),
+                    ("—**—", 'Ь'),
+                    ("**—**", 'Э'),
+                    ("**——", 'Ю'),
+                    ("*—*—", 'Я')
+                ]),
             },
             Command::none(),
         )
@@ -57,32 +101,37 @@ impl Application for Promt {
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        let time = self.timer.elapsed().unwrap().as_millis();
         match message {
             Msg::KeyPressed => {
-                self.timer = SystemTime::now();
+                if self.space_time.contains(&time){
+                    self.morze.push(' ')
+                }
             }
             Msg::KeyReleased => {
-                let low_dot = self.dot_time / 2;
-                let hi_dot = self.dot_time * 3 / 2;
-                let hi_line = self.dot_time * 9 / 2;
-                let time = self.timer.elapsed().unwrap().as_millis();
-                if (low_dot..=hi_dot).contains(&time) {
-                    self.morze.push('•');
-                } else if (hi_dot..=hi_line).contains(&time) {
+                if self.dot_time.contains(&time) {
+                    self.morze.push('*');
+                } else if self.line_time.contains(&time) {
                     self.morze.push('—');
                 }
             }
             Msg::Clear => {
                 self.morze.clear();
+                self.text.clear();
+            }
+            Msg::Decode => {
+                self.text = self.decode();
             }
         };
+        self.timer = SystemTime::now();
         Command::none()
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
         column!(
             row!(text_input("", &self.morze)),
-            row!(button("clear").on_press(Msg::Clear))
+            row!(text_input("", &self.text)),
+            row!(button("clear").on_press(Msg::Clear), button("decode").on_press(Msg::Decode))
         )
         .padding(10)
         .into()
@@ -98,5 +147,18 @@ impl Application for Promt {
             _ => None,
         });
         Subscription::batch(vec![on_press, on_release])
+    }
+}
+
+impl Promt<'_>{
+    fn decode(&self) -> String{
+        let mut ret = String::new();
+        for i in self.morze.split(' '){
+            ret.push(match self.morze_table.get(i) {
+                Some(&ch) => ch,
+                None => ' '
+            })
+        }
+        ret
     }
 }
